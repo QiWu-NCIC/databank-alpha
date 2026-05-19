@@ -10,7 +10,15 @@
       <div class="page-navbar">
         <el-link type="primary" @click="handleSource">Source</el-link>
         <el-divider direction="vertical" />
-        <el-link type="primary" @click="handleSummit">Summit your code</el-link>
+        <el-link type="primary" @click="handleSummit">Submit your code</el-link>
+        <el-divider direction="vertical" />
+        <el-link type="primary" @click="handleSubmitResult">
+          Submit your result
+        </el-link>
+        <el-divider direction="vertical" />
+        <el-link type="primary" @click="handleTemplate">
+          Download CSV template
+        </el-link>
         <el-divider direction="vertical" />
         <el-link type="primary" @click="handleResult">Download results</el-link>
       </div>
@@ -26,7 +34,7 @@
               <el-form-item label="Machine&Compiler：" prop="machineCompiler">
                 <el-radio-group
                   v-model="state.searchForm.machineCompiler"
-                  @change="filterExcelData"
+                  @change="filterData"
                 >
                   <el-radio
                     v-for="(item, index) in machineCompilerOptins"
@@ -43,7 +51,7 @@
               <el-form-item label="DataTyper：" prop="dataType">
                 <el-radio-group
                   v-model="state.searchForm.dataType"
-                  @change="filterExcelData"
+                  @change="filterData"
                 >
                   <el-radio
                     v-for="(item, index) in dataTypeOptins"
@@ -60,7 +68,7 @@
               <el-form-item label="time phase：" prop="timePhase">
                 <el-radio-group
                   v-model="state.searchForm.timePhase"
-                  @change="filterExcelData"
+                  @change="filterData"
                 >
                   <el-radio
                     v-for="(item, index) in timePhaseOptins"
@@ -168,11 +176,10 @@
 </template>
 <script setup>
 import MultiplierBar from "./components/MultiplierBar.vue";
-import * as XLSX from "xlsx";
 
 const { proxy } = getCurrentInstance();
 
-const excelData = ref([]);
+const sourceData = ref([]);
 const machineCompilerOptins = ref([]);
 const dataTypeOptins = ref([]);
 const timePhaseOptins = ref([]);
@@ -205,27 +212,80 @@ const colorMap = {
   moreThan100: "#df562c", // +100%以上
 };
 
+const parseCsv = (text) => {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        value += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === "," && !inQuotes) {
+      row.push(value);
+      value = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && nextChar === "\n") {
+        i += 1;
+      }
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = "";
+      continue;
+    }
+
+    value += char;
+  }
+
+  if (value || row.length) {
+    row.push(value);
+    rows.push(row);
+  }
+
+  return rows.filter((item) => item.some((cell) => cell !== ""));
+};
+
+const getUniqueColumnValues = (rows, columnIndex) => {
+  const values = rows
+    .map((row) =>
+      row[columnIndex] !== undefined && row[columnIndex] !== null
+        ? String(row[columnIndex]).trim()
+        : "",
+    )
+    .filter((value) => value !== "");
+
+  return [...new Set(values)];
+};
+
 // 获取file文件数据
-const loadExcelData = async () => {
+const loadCsvData = async () => {
   loading.value = true;
   try {
-    // 获取 Excel 文件 - 使用 BASE_URL 确保在 GitHub Pages 子路径部署时也能正确访问
-    const response = await fetch(`${import.meta.env.BASE_URL}file/SPMV.xlsx`);
-    const arrayBuffer = await response.arrayBuffer();
+    // 获取 CSV 文件 - 使用 BASE_URL 确保在 GitHub Pages 子路径部署时也能正确访问
+    const response = await fetch(`${import.meta.env.BASE_URL}file/SPMV.csv`);
+    const csvText = await response.text();
 
-    // 解析 Excel 文件
-    const workbook = XLSX.read(arrayBuffer, { type: "array" });
-
-    // console.log("Excel 文件解析成功:", workbook);
-
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-    if (jsonData.length > 0) {
-      // console.log("Excel 文件解析成功:", jsonData);
+    const csvData = parseCsv(csvText);
+    if (csvData.length > 0) {
       // 第一行作为列名
-      const headers = jsonData[0];
-      const rows = jsonData.slice(2).map((row) => {
+      const headers = csvData[0];
+      const dataRows = csvData.slice(2);
+      const rows = dataRows.map((row) => {
         const obj = {};
         headers.forEach((header, index) => {
           obj[header] = row[index] || "";
@@ -233,38 +293,13 @@ const loadExcelData = async () => {
         return obj;
       });
 
-      let machineCompilerList = [];
-      jsonData.slice(2).forEach((row) => {
-        const value =
-          row[1] !== undefined && row[1] !== null ? String(row[1]).trim() : "";
-        if (value !== "") {
-          machineCompilerList.push(value);
-        }
-      });
-      let dataTypeList = [];
-      jsonData.slice(2).forEach((row) => {
-        const value =
-          row[2] !== undefined && row[2] !== null ? String(row[2]).trim() : "";
-        if (value !== "") {
-          dataTypeList.push(value);
-        }
-      });
-      let timePhaseList = [];
-      jsonData.slice(2).forEach((row) => {
-        const value =
-          row[5] !== undefined && row[5] !== null ? String(row[5]).trim() : "";
-        if (value !== "") {
-          timePhaseList.push(value);
-        }
-      });
-
-      excelData.value = rows;
+      sourceData.value = rows;
       const allMatList = headers.slice(7);
       matList.value =
         allMatList.length > 100 ? allMatList.slice(0, 100) : allMatList;
-      machineCompilerOptins.value = [...new Set(machineCompilerList)];
-      dataTypeOptins.value = [...new Set(dataTypeList)];
-      timePhaseOptins.value = [...new Set(timePhaseList)];
+      machineCompilerOptins.value = getUniqueColumnValues(dataRows, 1);
+      dataTypeOptins.value = getUniqueColumnValues(dataRows, 2);
+      timePhaseOptins.value = getUniqueColumnValues(dataRows, 5);
 
       if (machineCompilerOptins.value.length) {
         state.searchForm.machineCompiler = machineCompilerOptins.value[0];
@@ -277,24 +312,24 @@ const loadExcelData = async () => {
       }
 
       loading.value = false;
-      filterExcelData();
+      filterData();
     }
   } catch (error) {
     loading.value = false;
     console.error(
       "尝试访问的路径:",
-      `${import.meta.env.BASE_URL}file/SPMV.xlsx`,
+      `${import.meta.env.BASE_URL}file/SPMV.csv`,
     );
     proxy.$message.error("加载数据文件失败，请检查文件路径");
   }
 };
 
 // 筛选数据
-const filterExcelData = () => {
+const filterData = () => {
   // console.log("state.searchForm", state.searchForm);
-  // console.log("excelData", excelData.value);
+  // console.log("sourceData", sourceData.value);
 
-  state.tableData = excelData.value.filter((item) => {
+  state.tableData = sourceData.value.filter((item) => {
     let result = true;
     if (state.searchForm.machineCompiler) {
       result =
@@ -399,6 +434,20 @@ const handleSummit = () => {
   window.open("https://github.com/QiWu-NCIC/QiWu-SpMV", "_blank");
 };
 
+// Submit result
+const handleSubmitResult = () => {
+  const title = encodeURIComponent("[SPMV Result] ");
+  window.open(
+    `https://github.com/QiWu-NCIC/databank-web/issues/new?template=spmv-result.yml&title=${title}`,
+    "_blank",
+  );
+};
+
+// Download CSV template
+const handleTemplate = () => {
+  window.open(`${import.meta.env.BASE_URL}file/SPMV-template.csv`, "_blank");
+};
+
 // 修改结果文件
 const handleResult = () => {
   window.open(
@@ -408,7 +457,7 @@ const handleResult = () => {
 };
 
 onMounted(() => {
-  loadExcelData();
+  loadCsvData();
 });
 </script>
 <style lang="scss" scoped>
