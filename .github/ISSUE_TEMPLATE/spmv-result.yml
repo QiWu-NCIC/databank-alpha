@@ -6,8 +6,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Please fill in the metadata below and provide the benchmark result CSV.
-        The CSV must use the same header columns as `public/file/SPMV.csv`.
+        Please fill in the metadata below and provide the benchmark result as long-form CSV.
+        Each CSV row should contain one matrix result.
         You can download a template from `https://qiwu-ncic.github.io/databank-web/file/SPMV-template.csv`.
         Preferred: paste the CSV content into `Result CSV`.
         Alternative: upload the completed CSV template in `CSV upload`.
@@ -82,10 +82,11 @@ body:
     id: result_csv
     attributes:
       label: Result CSV
-      description: Paste the CSV header row and one or more result rows. This is preferred for automatic import. If you upload a CSV file below instead, write `uploaded` here.
+      description: Paste the long-form CSV header row and one or more result rows. This is preferred for automatic import. If you upload a CSV file below instead, write `uploaded` here.
       placeholder: |
-        Kernel,Machine&Compiler,DataType,Baseline tag,openSource,time phase,Matrix-all,12month1,130bit,...
-        MyKernel,NV-A100 / CUDA 12.2,double,F,Y,solve_only,1.23,0.01,0.02,...
+        Kernel,Machine&Compiler,DataType,Baseline tag,openSource,time phase,Matrix-all,Matrix,Time
+        MyKernel,NV-A100 / CUDA 12.2,double,F,Y,solve_only,1.23,12month1,0.01
+        MyKernel,NV-A100 / CUDA 12.2,double,F,Y,solve_only,1.23,130bit,0.02
     validations:
       required: true
 
@@ -93,7 +94,7 @@ body:
     id: csv_upload
     attributes:
       label: CSV upload
-      description: Optional. Drag and drop the completed CSV template here if you do not paste the CSV content above.
+      description: Optional. Drag and drop the completed long-form CSV template here if you do not paste the CSV content above.
       placeholder: "Upload the completed CSV template here, or leave this blank if you pasted the CSV above."
     validations:
       required: false
