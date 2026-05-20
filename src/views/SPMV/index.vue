@@ -31,13 +31,30 @@
         >
           <el-row :gutter="20">
             <el-col :span="24">
-              <el-form-item label="Machine&Compiler：" prop="machineCompiler">
+              <el-form-item label="Machine：" prop="machine">
                 <el-radio-group
-                  v-model="state.searchForm.machineCompiler"
+                  v-model="state.searchForm.machine"
+                  @change="handleMachineChange"
+                >
+                  <el-radio
+                    v-for="(item, index) in machineOptins"
+                    :key="index"
+                    :value="item"
+                    border
+                    >{{ item }}</el-radio
+                  >
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+
+            <el-col :span="24">
+              <el-form-item label="Compiler：" prop="compiler">
+                <el-radio-group
+                  v-model="state.searchForm.compiler"
                   @change="filterData"
                 >
                   <el-radio
-                    v-for="(item, index) in machineCompilerOptins"
+                    v-for="(item, index) in compilerOptins"
                     :key="index"
                     :value="item"
                     border
@@ -180,7 +197,8 @@ import MultiplierBar from "./components/MultiplierBar.vue";
 const { proxy } = getCurrentInstance();
 
 const sourceData = ref([]);
-const machineCompilerOptins = ref([]);
+const machineOptins = ref([]);
+const compilerOptins = ref([]);
 const dataTypeOptins = ref([]);
 const timePhaseOptins = ref([]);
 const allMatList = ref([]);
@@ -188,7 +206,8 @@ const matList = ref([]);
 const loading = ref(false);
 const state = reactive({
   searchForm: {
-    machineCompiler: "",
+    machine: "",
+    compiler: "",
     dataType: "",
     timePhase: "",
   },
@@ -273,6 +292,43 @@ const getUniqueColumnValues = (rows, columnIndex) => {
   return [...new Set(values)];
 };
 
+const splitMachineCompiler = (value) => {
+  const parts = String(value ?? "")
+    .split("/")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return {
+    machine: parts[0] || "Unknown",
+    compiler: parts.slice(1).join(" / ") || "Unspecified",
+  };
+};
+
+const getUniqueObjectValues = (rows, key) => {
+  const values = rows
+    .map((row) => String(row[key] ?? "").trim())
+    .filter(Boolean);
+
+  return [...new Set(values)];
+};
+
+const updateCompilerOptions = (resetSelection = false) => {
+  const rows = sourceData.value.filter(
+    (item) => item.__machine === state.searchForm.machine,
+  );
+  const options = getUniqueObjectValues(rows, "__compiler");
+  compilerOptins.value = options;
+
+  if (resetSelection || !options.includes(state.searchForm.compiler)) {
+    state.searchForm.compiler = options[0] || "";
+  }
+};
+
+const handleMachineChange = () => {
+  updateCompilerOptions(true);
+  filterData();
+};
+
 // 获取file文件数据
 const loadCsvData = async () => {
   loading.value = true;
@@ -294,17 +350,21 @@ const loadCsvData = async () => {
         headers.forEach((header, index) => {
           obj[header] = row[index] || "";
         });
+        const machineCompiler = splitMachineCompiler(obj["Machine&Compiler"]);
+        obj.__machine = machineCompiler.machine;
+        obj.__compiler = machineCompiler.compiler;
         return obj;
       });
 
       sourceData.value = rows;
       allMatList.value = headers.slice(7);
-      machineCompilerOptins.value = getUniqueColumnValues(dataRows, 1);
+      machineOptins.value = getUniqueObjectValues(rows, "__machine");
       dataTypeOptins.value = getUniqueColumnValues(dataRows, 2);
       timePhaseOptins.value = getUniqueColumnValues(dataRows, 5);
 
-      if (machineCompilerOptins.value.length) {
-        state.searchForm.machineCompiler = machineCompilerOptins.value[0];
+      if (machineOptins.value.length) {
+        state.searchForm.machine = machineOptins.value[0];
+        updateCompilerOptions(true);
       }
       if (dataTypeOptins.value.length) {
         state.searchForm.dataType = dataTypeOptins.value[0];
@@ -333,10 +393,13 @@ const filterData = () => {
 
   state.tableData = sourceData.value.filter((item) => {
     let result = true;
-    if (state.searchForm.machineCompiler) {
-      result =
-        result && item["Machine&Compiler"] === state.searchForm.machineCompiler;
-      // console.log("Machine&Compiler", result);
+    if (state.searchForm.machine) {
+      result = result && item.__machine === state.searchForm.machine;
+      // console.log("Machine", result);
+    }
+    if (state.searchForm.compiler) {
+      result = result && item.__compiler === state.searchForm.compiler;
+      // console.log("Compiler", result);
     }
     if (state.searchForm.dataType) {
       result = result && item["DataType"] === state.searchForm.dataType;
