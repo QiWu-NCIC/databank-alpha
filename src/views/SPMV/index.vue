@@ -438,7 +438,7 @@ const handleSummit = () => {
 const handleSubmitResult = () => {
   const title = encodeURIComponent("[SPMV Result] ");
   window.open(
-    `https://github.com/QiWu-NCIC/databank-web/issues/new?template=spmv-result.yml&title=${title}`,
+    `https://github.com/QiWu-NCIC/databank-alpha/issues/new?template=spmv-result.yml&title=${title}`,
     "_blank",
   );
 };
@@ -451,7 +451,7 @@ const handleTemplate = () => {
 // 修改结果文件
 const handleResult = () => {
   window.open(
-    "https://github.com/QiWu-NCIC/databank-web/tree/main/public/file",
+    "https://github.com/QiWu-NCIC/databank-alpha/tree/main/public/file",
     "_blank",
   );
 };

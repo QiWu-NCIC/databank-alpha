@@ -10,7 +10,7 @@ body:
         Each CSV row should contain one matrix result.
         Matrix names are read from the `Matrix` column. They do not need to match `public/file/SPMV.csv` headers exactly.
         Existing matrix names update existing columns; new matrix names are reviewed and can be imported as new columns.
-        You can download a template from `https://qiwu-ncic.github.io/databank-web/file/SPMV-template.csv`.
+        You can download a template from `https://qiwu-ncic.github.io/databank-alpha/file/SPMV-template.csv`.
         Preferred: upload the completed CSV template in `CSV upload`.
         Alternative: paste the CSV content into `Result CSV`.
 
