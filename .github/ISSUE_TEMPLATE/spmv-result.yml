@@ -6,20 +6,28 @@ body:
   - type: markdown
     attributes:
       value: |
-        Please fill in the metadata below and provide the benchmark result as long-form CSV.
+        Please submit benchmark results as long-form CSV. The CSV is the source of truth for result metadata and timing values.
         Each CSV row should contain one matrix result.
+
+        Required CSV columns:
+        `Kernel,Machine&Compiler,DataType,Baseline tag,openSource,time phase,Matrix-all,Matrix,Time`
+
         Matrix names are read from the `Matrix` column. They do not need to match `public/file/SPMV.csv` headers exactly.
         Existing matrix names update existing columns; new matrix names are reviewed and can be imported as new columns.
-        You can download a template from `https://qiwu-ncic.github.io/databank-alpha/file/SPMV-template.csv`.
-        Preferred: upload the completed CSV template in `CSV upload`.
-        Alternative: paste the CSV content into `Result CSV`.
 
-  - type: input
-    id: kernel
+        You can download a template from `https://qiwu-ncic.github.io/databank-alpha/file/SPMV-template.csv`.
+        Preferred: upload the completed CSV in `Result CSV upload`.
+        Fallback: paste the CSV content into `Result CSV text`.
+
+  - type: dropdown
+    id: operator
     attributes:
-      label: Kernel
-      description: Kernel or implementation name shown in the result table.
-      placeholder: "e.g. cuSparse-12.2-CSR-ALG0"
+      label: Operator
+      description: Operator covered by this result CSV.
+      options:
+        - SPMV
+        - SPMM
+        - Other
     validations:
       required: true
 
@@ -27,77 +35,29 @@ body:
     id: source_url
     attributes:
       label: Source code URL
-      description: Link to the implementation, repository, commit, or release.
+      description: Optional. Link to the implementation, repository, commit, release, or benchmark scripts.
       placeholder: "https://github.com/..."
     validations:
-      required: true
-
-  - type: input
-    id: machine_compiler
-    attributes:
-      label: Machine&Compiler
-      description: Hardware and software environment used to run the benchmark.
-      placeholder: "e.g. NV-A100 / CUDA 12.2 / GCC 11"
-    validations:
-      required: true
-
-  - type: dropdown
-    id: data_type
-    attributes:
-      label: DataType
-      options:
-        - double
-        - single
-        - other
-    validations:
-      required: true
-
-  - type: input
-    id: time_phase
-    attributes:
-      label: time phase
-      description: Benchmark phase used by the result.
-      placeholder: "e.g. solve_only"
-    validations:
-      required: true
-
-  - type: dropdown
-    id: open_source
-    attributes:
-      label: openSource
-      options:
-        - "Y"
-        - "N"
-    validations:
-      required: true
-
-  - type: input
-    id: matrix_all
-    attributes:
-      label: Matrix-all
-      description: Geometric mean speedup or aggregate score shown in the bar chart.
-      placeholder: "e.g. 1.23"
-    validations:
-      required: true
+      required: false
 
   - type: textarea
     id: csv_upload
     attributes:
-      label: CSV upload
-      description: Preferred. Drag and drop the completed long-form CSV template here.
-      placeholder: "Upload the completed CSV template here."
+      label: Result CSV upload
+      description: Preferred. Drag and drop the completed long-form CSV file here.
+      placeholder: "Upload the completed CSV file here."
     validations:
       required: false
 
   - type: textarea
     id: result_csv
     attributes:
-      label: Result CSV
+      label: Result CSV text
       description: Optional fallback. Paste the long-form CSV header row and one or more result rows if you do not upload a CSV file above.
       placeholder: |
         Kernel,Machine&Compiler,DataType,Baseline tag,openSource,time phase,Matrix-all,Matrix,Time
-        MyKernel,NV-A100 / CUDA 12.2,double,F,Y,solve_only,1.23,12month1,0.01
-        MyKernel,NV-A100 / CUDA 12.2,double,F,Y,solve_only,1.23,130bit,0.02
+        MyKernel,NVIDIA GeForce RTX 5090 / Triton 3.6.0,double,F,Y,solve_only,1.23,12month1,0.01
+        MyKernel,NVIDIA GeForce RTX 5090 / Triton 3.6.0,double,F,Y,solve_only,1.23,130bit,0.02
     validations:
       required: false
 
