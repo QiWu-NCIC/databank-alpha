@@ -277,7 +277,10 @@ const loadCsvData = async () => {
   loading.value = true;
   try {
     // 获取 CSV 文件 - 使用 BASE_URL 确保在 GitHub Pages 子路径部署时也能正确访问
-    const response = await fetch(`${import.meta.env.BASE_URL}file/SPMV.csv`);
+    const response = await fetch(
+      `${import.meta.env.BASE_URL}file/SPMV.csv?v=${Date.now()}`,
+      { cache: "no-store" },
+    );
     const csvText = await response.text();
 
     const csvData = parseCsv(csvText);
