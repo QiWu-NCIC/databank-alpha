@@ -183,6 +183,7 @@ const sourceData = ref([]);
 const machineCompilerOptins = ref([]);
 const dataTypeOptins = ref([]);
 const timePhaseOptins = ref([]);
+const allMatList = ref([]);
 const matList = ref([]);
 const loading = ref(false);
 const state = reactive({
@@ -297,9 +298,7 @@ const loadCsvData = async () => {
       });
 
       sourceData.value = rows;
-      const allMatList = headers.slice(7);
-      matList.value =
-        allMatList.length > 100 ? allMatList.slice(0, 100) : allMatList;
+      allMatList.value = headers.slice(7);
       machineCompilerOptins.value = getUniqueColumnValues(dataRows, 1);
       dataTypeOptins.value = getUniqueColumnValues(dataRows, 2);
       timePhaseOptins.value = getUniqueColumnValues(dataRows, 5);
@@ -366,6 +365,15 @@ const filterData = () => {
     const bValue = parseFloat(b["Matrix-all"]) || 0;
     return bValue - aValue;
   });
+
+  matList.value = allMatList.value
+    .filter((mat) =>
+      state.tableData.some((item) => {
+        const value = item[mat];
+        return value !== undefined && value !== null && String(value).trim();
+      }),
+    )
+    .slice(0, 100);
 
   console.log("state.tableData", state.tableData);
   console.log("state.baseData", state.baseData);
