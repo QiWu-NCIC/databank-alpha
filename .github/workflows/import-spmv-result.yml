@@ -19,6 +19,7 @@ jobs:
   import-spmv-result:
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      contains(github.event.issue.title, '[SPMV Result]') ||
       (contains(github.event.issue.labels.*.name, 'result-submission') &&
       contains(github.event.issue.labels.*.name, 'spmv'))
     runs-on: ubuntu-latest

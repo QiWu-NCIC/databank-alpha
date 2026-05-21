@@ -23,11 +23,7 @@ const uploadSection = getIssueFormSection(body, "Result CSV upload");
 const upload = findCsvLink(uploadSection) || findCsvLink(body);
 
 if (upload) {
-  const response = await fetch(upload.url, {
-    headers: process.env.GITHUB_TOKEN
-      ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
-      : {},
-  });
+  const response = await fetchWithRetry(upload.url);
 
   if (!response.ok) {
     throw new Error(`Failed to download ${upload.url}: ${response.status} ${response.statusText}`);
@@ -93,6 +89,32 @@ function validateCsvText(text, source) {
       `${source} has an invalid header. Expected exactly: ${REQUIRED_HEADER}`,
     );
   }
+}
+
+async function fetchWithRetry(url, attempts = 3) {
+  let lastError;
+  const headers = process.env.GITHUB_TOKEN
+    ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+    : {};
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(url, { headers });
+      if (response.ok || attempt === attempts) {
+        return response;
+      }
+      lastError = new Error(`${response.status} ${response.statusText}`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) {
+        throw error;
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+  }
+
+  throw lastError;
 }
 
 function writeGithubOutput(name, value) {
