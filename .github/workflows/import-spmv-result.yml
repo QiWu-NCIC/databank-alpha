@@ -1,0 +1,122 @@
+name: Import SPMV result submission
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number to import
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  import-spmv-result:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.issue.labels.*.name, 'result-submission') &&
+      contains(github.event.issue.labels.*.name, 'spmv'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Fetch issue for manual run
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+        run: |
+          mkdir -p .github/tmp
+          gh issue view "$ISSUE_NUMBER" --json number,body,title,labels > .github/tmp/manual-issue-event.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const issue = JSON.parse(fs.readFileSync(".github/tmp/manual-issue-event.json", "utf8"));
+          fs.writeFileSync(
+            ".github/tmp/manual-event.json",
+            JSON.stringify({ issue }, null, 2),
+          );
+          NODE
+
+      - name: Extract submitted CSV
+        id: csv
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+          ISSUE_EVENT_PATH: ${{ github.event_name == 'workflow_dispatch' && '.github/tmp/manual-event.json' || github.event_path }}
+          OUTPUT_DIR: public/issue_download
+        run: node scripts/extract-spmv-issue-csv.mjs
+
+      - name: Validate import
+        run: node scripts/import-spmv-long-form.mjs "${{ steps.csv.outputs.csv_path }}" --dry-run | tee .github/tmp/import-dry-run.json
+
+      - name: Import results
+        run: node scripts/import-spmv-long-form.mjs "${{ steps.csv.outputs.csv_path }}" | tee .github/tmp/import-summary.json
+
+      - name: Check changes
+        id: changes
+        run: |
+          if git diff --quiet -- public/file/SPMV.csv public/issue_download; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create import branch
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+        run: |
+          branch="auto/import-spmv-result-${ISSUE_NUMBER}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add public/file/SPMV.csv public/issue_download
+          git commit -m "Import SPMV results from issue #${ISSUE_NUMBER}"
+          git push --force-with-lease origin "$branch"
+          echo "IMPORT_BRANCH=$branch" >> "$GITHUB_ENV"
+
+      - name: Open or update pull request
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+        run: |
+          pr_number="$(gh pr list --head "$IMPORT_BRANCH" --state open --json number --jq '.[0].number // ""')"
+          body="$(cat <<EOF
+          Imports SPMV result CSV from #${ISSUE_NUMBER}.
+
+          CSV source: ${{ steps.csv.outputs.csv_source }}
+
+          This PR was generated automatically. Review the diff in public/file/SPMV.csv before merging.
+          EOF
+          )"
+
+          if [ -z "$pr_number" ]; then
+            gh pr create \
+              --head "$IMPORT_BRANCH" \
+              --base "${{ github.event.repository.default_branch }}" \
+              --title "Import SPMV results from issue #${ISSUE_NUMBER}" \
+              --body "$body"
+          else
+            gh pr edit "$pr_number" --title "Import SPMV results from issue #${ISSUE_NUMBER}" --body "$body"
+          fi
+
+      - name: Comment when no changes
+        if: steps.changes.outputs.changed == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body "The submitted CSV was valid, but importing it did not change public/file/SPMV.csv."

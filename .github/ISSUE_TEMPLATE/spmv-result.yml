@@ -18,6 +18,7 @@ body:
         You can download a template from `https://qiwu-ncic.github.io/databank-alpha/file/SPMV-template.csv`.
         Preferred: upload the completed CSV in `Result CSV upload`.
         Fallback: paste the CSV content into `Result CSV text`.
+        After submission, a GitHub Action will save the submitted CSV under `public/issue_download/`, validate it, and open a pull request that updates `public/file/SPMV.csv`.
 
   - type: dropdown
     id: operator
