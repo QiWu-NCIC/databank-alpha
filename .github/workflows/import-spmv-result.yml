@@ -59,6 +59,9 @@ jobs:
           OUTPUT_DIR: public/issue_download
         run: node scripts/extract-spmv-issue-csv.mjs
 
+      - name: Prepare import summary directory
+        run: mkdir -p .github/tmp
+
       - name: Validate import
         run: node scripts/import-spmv-long-form.mjs "${{ steps.csv.outputs.csv_path }}" --dry-run | tee .github/tmp/import-dry-run.json
 
