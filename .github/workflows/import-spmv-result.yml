@@ -94,28 +94,108 @@ jobs:
       - name: Open or update pull request
         if: steps.changes.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
         run: |
-          pr_number="$(gh pr list --head "$IMPORT_BRANCH" --state open --json number --jq '.[0].number // ""')"
-          body="$(cat <<EOF
-          Imports SPMV result CSV from #${ISSUE_NUMBER}.
+          node --input-type=module <<'NODE'
+          const [owner, repo] = process.env.GITHUB_REPOSITORY.split("/");
+          const branch = process.env.IMPORT_BRANCH;
+          const issueNumber = process.env.ISSUE_NUMBER;
+          const baseBranch = "${{ github.event.repository.default_branch }}";
+          const title = `Import SPMV results from issue #${issueNumber}`;
+          const body = [
+            `Imports SPMV result CSV from #${issueNumber}.`,
+            "",
+            "CSV source: ${{ steps.csv.outputs.csv_source }}",
+            "",
+            "This PR was generated automatically. Review the diff in public/file/SPMV.csv before merging.",
+          ].join("\n");
+          const headers = {
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+          };
+          const apiBase = `https://api.github.com/repos/${owner}/${repo}`;
+          const compareUrl = `https://github.com/${owner}/${repo}/compare/${baseBranch}...${branch}?expand=1`;
 
-          CSV source: ${{ steps.csv.outputs.csv_source }}
+          try {
+            const listUrl = new URL(`${apiBase}/pulls`);
+            listUrl.searchParams.set("state", "open");
+            listUrl.searchParams.set("head", `${owner}:${branch}`);
+            const existing = await githubJson(listUrl, { headers });
 
-          This PR was generated automatically. Review the diff in public/file/SPMV.csv before merging.
-          EOF
-          )"
+            if (existing.length) {
+              await githubJson(`${apiBase}/pulls/${existing[0].number}`, {
+                method: "PATCH",
+                headers,
+                body: JSON.stringify({ title, body }),
+              });
+              console.log(`Updated PR #${existing[0].number}`);
+            } else {
+              const created = await githubJson(`${apiBase}/pulls`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                  title,
+                  head: branch,
+                  base: baseBranch,
+                  body,
+                }),
+              });
+              console.log(`Created PR #${created.number}`);
+            }
+          } catch (error) {
+            console.log(`Automatic PR creation failed: ${error.message}`);
+            console.log(`Create the PR manually: ${compareUrl}`);
+            await writeJobSummary(compareUrl);
+            await commentIssue(compareUrl);
+          }
 
-          if [ -z "$pr_number" ]; then
-            gh pr create \
-              --head "$IMPORT_BRANCH" \
-              --base "${{ github.event.repository.default_branch }}" \
-              --title "Import SPMV results from issue #${ISSUE_NUMBER}" \
-              --body "$body"
-          else
-            gh pr edit "$pr_number" --title "Import SPMV results from issue #${ISSUE_NUMBER}" --body "$body"
-          fi
+          async function githubJson(url, options) {
+            const response = await fetch(url, options);
+            const text = await response.text();
+            if (!response.ok) {
+              throw new Error(`${response.status} ${response.statusText}: ${text}`);
+            }
+            return text ? JSON.parse(text) : null;
+          }
+
+          async function commentIssue(url) {
+            try {
+              await githubJson(`${apiBase}/issues/${issueNumber}/comments`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                  body: [
+                    "The result CSV was imported and pushed to an import branch, but this repository does not allow GitHub Actions to create pull requests.",
+                    "",
+                    `Create the PR manually: ${url}`,
+                  ].join("\n"),
+                }),
+              });
+            } catch (error) {
+              console.log(`Issue comment fallback also failed: ${error.message}`);
+            }
+          }
+
+          async function writeJobSummary(url) {
+            if (!process.env.GITHUB_STEP_SUMMARY) {
+              return;
+            }
+            const fs = await import("node:fs/promises");
+            await fs.appendFile(
+              process.env.GITHUB_STEP_SUMMARY,
+              [
+                "### Manual pull request required",
+                "",
+                "The import branch was pushed, but repository settings do not allow GitHub Actions to create pull requests.",
+                "",
+                `[Create PR](${url})`,
+                "",
+              ].join("\n"),
+            );
+          }
+          NODE
 
       - name: Comment when no changes
         if: steps.changes.outputs.changed == 'false'
